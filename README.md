@@ -29,3 +29,9 @@ Les avertissements ne font pas échouer le build (`abortOnError = false` dans `a
 passe-le à `true` quand tu voudras que le lint soit bloquant.
 
 Le dossier `store/` contient l'icône 1024 px et celle de 512 px pour le Play Store ; `assets-source/` garde les images d'origine.
+
+## Versions de l'outillage
+
+Android Gradle Plugin 9.1.1 (Kotlin intégré, donc pas de plugin `kotlin-android`), Gradle 9.3.1, Kotlin 2.3.10,
+KSP 2.3.6, compileSdk et targetSdk 37, Compose BOM 2026.09.00, Room 2.8.5. JDK 17 requis.
+Pour ouvrir le projet dans Android Studio, utiliser une version récente qui gère AGP 9.
