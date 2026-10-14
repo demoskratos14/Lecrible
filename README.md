@@ -6,10 +6,26 @@ Appli Android qui « crible » tes notifications : elle les capte, les retire de
 - Exclus par défaut : SMS, WhatsApp, téléphone (appels entrants et manqués).
 - Au premier lancement : appuyer sur « Autoriser l'accès » puis activer Le Crible dans la liste.
 
-## Compiler l'APK avec GitHub
+## Compiler, tester et analyser avec GitHub
 
 1. Envoyer le contenu du dossier sur un dépôt GitHub (branche `main`).
 2. Onglet **Actions** → workflow **Build APK** (se lance à chaque push, ou bouton *Run workflow*).
-3. Une fois terminé : télécharger l'artefact **LeCrible-debug-apk** en bas de la page du run.
+3. Une fois terminé, trois artefacts sont disponibles en bas de la page du run :
+   - **LeCrible-debug-apk** : l'APK à installer ;
+   - **LeCrible-rapport-tests** : rapport des tests unitaires (ouvrir `index.html`) ;
+   - **LeCrible-rapport-lint** : rapport lint (ouvrir `lint-results-debug.html`).
 
-Le dossier `store/` contient l'icône 1024 px et celle de 512 px pour le Play Store ; `assets-source/` garde l'image d'origine et la version à fond retiré.
+## Tests
+
+- `app/src/test/` : tests unitaires JVM (règles de tri des notifications, `NotifFilterTest`).
+  En local : `./gradlew testDebugUnitTest` (ou clic droit sur le dossier dans Android Studio).
+- `app/src/androidTest/` : tests instrumentés de la base Room (`NotifDaoTest`), à lancer sur un émulateur
+  ou un téléphone : `./gradlew connectedDebugAndroidTest`. Ils ne sont pas exécutés par GitHub Actions.
+
+## Lint
+
+`./gradlew lintDebug` produit `app/build/reports/lint-results-debug.html`.
+Les avertissements ne font pas échouer le build (`abortOnError = false` dans `app/build.gradle.kts`) ;
+passe-le à `true` quand tu voudras que le lint soit bloquant.
+
+Le dossier `store/` contient l'icône 1024 px et celle de 512 px pour le Play Store ; `assets-source/` garde les images d'origine.

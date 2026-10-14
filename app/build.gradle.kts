@@ -15,6 +15,7 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
@@ -28,6 +29,15 @@ android {
     }
     kotlinOptions { jvmTarget = "17" }
     buildFeatures { compose = true }
+
+    // Rapport lint : HTML (à lire) + XML (pour outils) ; les avertissements ne bloquent pas le build
+    lint {
+        abortOnError = false
+        htmlReport = true
+        xmlReport = true
+        textReport = false
+        checkDependencies = true
+    }
 }
 
 dependencies {
@@ -42,4 +52,12 @@ dependencies {
     implementation("androidx.room:room-runtime:$room")
     implementation("androidx.room:room-ktx:$room")
     ksp("androidx.room:room-compiler:$room")
+
+    // Tests unitaires (JVM)
+    testImplementation("junit:junit:4.13.2")
+
+    // Tests instrumentés (émulateur / téléphone)
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.room:room-testing:$room")
 }

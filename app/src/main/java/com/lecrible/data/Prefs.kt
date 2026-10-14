@@ -1,6 +1,7 @@
 package com.lecrible.data
 
 import android.content.Context
+import com.lecrible.NotifFilter
 
 class Prefs(ctx: Context) {
     private val sp = ctx.applicationContext.getSharedPreferences("prefs", Context.MODE_PRIVATE)
@@ -11,20 +12,10 @@ class Prefs(ctx: Context) {
         set(v) = sp.edit().putBoolean("includeMode", v).apply()
 
     var excluded: Set<String>
-        get() = sp.getStringSet("excluded", DEFAULT_EXCLUDED)!!.toSet()
+        get() = sp.getStringSet("excluded", NotifFilter.DEFAULT_EXCLUDED)!!.toSet()
         set(v) = sp.edit().putStringSet("excluded", v).apply()
 
     var included: Set<String>
         get() = sp.getStringSet("included", emptySet())!!.toSet()
         set(v) = sp.edit().putStringSet("included", v).apply()
-
-    companion object {
-        // SMS, WhatsApp, téléphone (variantes courantes selon les constructeurs)
-        val DEFAULT_EXCLUDED = setOf(
-            "com.whatsapp", "com.whatsapp.w4b",
-            "com.google.android.apps.messaging", "com.samsung.android.messaging", "com.android.mms",
-            "com.google.android.dialer", "com.samsung.android.dialer", "com.android.dialer",
-            "com.android.server.telecom", "com.android.phone", "com.samsung.android.incallui"
-        )
-    }
 }

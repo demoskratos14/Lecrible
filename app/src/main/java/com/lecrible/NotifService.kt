@@ -40,12 +40,16 @@ class NotifService : NotificationListenerService() {
 
     private fun shouldCapture(prefs: Prefs, sbn: StatusBarNotification): Boolean {
         val n = sbn.notification
-        if (sbn.packageName == packageName) return false
-        if (sbn.isOngoing) return false                                   // musique, navigation, appel en cours
-        if ((n.flags and Notification.FLAG_GROUP_SUMMARY) != 0) return false
-        if (n.category == Notification.CATEGORY_CALL) return false        // appels entrants / manqués
-        return if (prefs.includeMode) sbn.packageName in prefs.included
-        else sbn.packageName !in prefs.excluded
+        return NotifFilter.shouldCapture(
+            pkg = sbn.packageName,
+            ownPackage = packageName,
+            isOngoing = sbn.isOngoing,
+            isGroupSummary = (n.flags and Notification.FLAG_GROUP_SUMMARY) != 0,
+            category = n.category,
+            includeMode = prefs.includeMode,
+            included = prefs.included,
+            excluded = prefs.excluded
+        )
     }
 
     override fun onDestroy() {
