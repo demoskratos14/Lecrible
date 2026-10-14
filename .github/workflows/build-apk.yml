@@ -30,11 +30,38 @@ jobs:
           gradle-version: "8.10.2"
 
       - name: Compiler l'APK (debug)
-        run: gradle assembleDebug --no-daemon --stacktrace
+        run: gradle assembleDebug --stacktrace
+
+      - name: Tests unitaires
+        run: gradle testDebugUnitTest --stacktrace
+
+      - name: Analyse lint
+        run: gradle lintDebug --stacktrace
 
       - name: Publier l'APK
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: LeCrible-debug-apk
           path: app/build/outputs/apk/debug/*.apk
-          if-no-files-found: error
+          if-no-files-found: warn
+
+      - name: Publier le rapport de tests
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: LeCrible-rapport-tests
+          path: |
+            app/build/reports/tests/testDebugUnitTest/
+            app/build/test-results/testDebugUnitTest/
+          if-no-files-found: warn
+
+      - name: Publier le rapport lint
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: LeCrible-rapport-lint
+          path: |
+            app/build/reports/lint-results-debug.html
+            app/build/reports/lint-results-debug.xml
+          if-no-files-found: warn
