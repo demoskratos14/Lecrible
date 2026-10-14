@@ -19,8 +19,10 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - name: Installer le SDK Android
-        uses: android-actions/setup-android@v3
+      # Le SDK Android est déjà préinstallé sur ubuntu-latest : on accepte juste les licences
+      # (l'action android-actions/setup-android échoue sur cette image).
+      - name: Accepter les licences du SDK Android
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
 
       - name: Installer Gradle
         uses: gradle/actions/setup-gradle@v4
