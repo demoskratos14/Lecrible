@@ -1,32 +1,37 @@
 package com.lecrible
 
+import android.Manifest
 import android.content.Intent
-import android.provider.Settings
+import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.lecrible.data.AppDb
 import com.lecrible.data.NotifEntity
 import com.lecrible.data.Prefs
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.DateFormat
@@ -35,7 +40,13 @@ import java.util.Date
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { MaterialTheme(colorScheme = darkColorScheme()) { App() } }
+        setContent { MaterialTheme(
+            colorScheme = darkColorScheme(
+                onBackground = Color.White,
+                onSurface = Color.White,
+                onSurfaceVariant = Color.White
+            )
+        ) { App() } }
     }
 }
 
@@ -46,47 +57,61 @@ fun App() {
     var tab by remember { mutableIntStateOf(0) }
     var allowed by remember { mutableStateOf(false) }
 
+    // Android 13+ : autorisation d'afficher la notification silencieuse qui fait apparaître la pastille sur l'icône
+    val askPostNotifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT >= 33) askPostNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+    }
+
     LifecycleResumeEffect(Unit) {
         allowed = NotificationManagerCompat.getEnabledListenerPackages(ctx).contains(ctx.packageName)
         onPauseOrDispose { }
     }
 
     Box(Modifier.fillMaxSize()) {
-    Image(
-        painter = painterResource(R.drawable.fond_le_crible),
-        contentDescription = null,
-        modifier = Modifier.fillMaxSize(),
-        contentScale = ContentScale.Crop
-    )
-    Box(Modifier.fillMaxSize().background(Color(0xB3060B18)))   // voile pour la lisibilité
-    Scaffold(
-        containerColor = Color.Transparent,
-        topBar = {
-            TopAppBar(
-                title = { Text("Le Crible") },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
-            )
-        }
-    ) { pad ->
-        Column(Modifier.padding(pad)) {
-            if (!allowed) {
-                Card(Modifier.padding(12.dp).fillMaxWidth()) {
-                    Column(Modifier.padding(16.dp)) {
-                        Text("L'accès aux notifications n'est pas activé.")
-                        Spacer(Modifier.height(8.dp))
-                        Button(onClick = {
-                            ctx.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
-                        }) { Text("Autoriser l'accès") }
+        Image(
+            painter = painterResource(R.drawable.fond_le_crible),
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
+        )
+        Box(Modifier.fillMaxSize().background(Color(0xB3060B18)))   // voile pour la lisibilité
+        Scaffold(
+            containerColor = Color.Transparent,
+            contentColor = Color.White,
+            topBar = {
+                TopAppBar(
+                    title = { Text("Le Crible") },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = Color.Transparent,
+                        titleContentColor = Color.White
+                    )
+                )
+            }
+        ) { pad ->
+            Column(Modifier.padding(pad)) {
+                if (!allowed) {
+                    Card(Modifier.padding(12.dp).fillMaxWidth()) {
+                        Column(Modifier.padding(16.dp)) {
+                            Text("L'accès aux notifications n'est pas activé.")
+                            Spacer(Modifier.height(8.dp))
+                            Button(onClick = {
+                                ctx.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                            }) { Text("Autoriser l'accès") }
+                        }
                     }
                 }
+                TabRow(
+                    selectedTabIndex = tab,
+                    containerColor = Color.Transparent,
+                    contentColor = Color.White
+                ) {
+                    Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("Reçues") })
+                    Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("Réglages") })
+                }
+                if (tab == 0) InboxScreen() else SettingsScreen()
             }
-            TabRow(selectedTabIndex = tab, containerColor = Color.Transparent) {
-                Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("Reçues") })
-                Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("Réglages") })
-            }
-            if (tab == 0) InboxScreen() else SettingsScreen()
         }
-    }
     }
 }
 
@@ -94,6 +119,7 @@ fun App() {
 fun InboxScreen() {
     val ctx = LocalContext.current
     val dao = remember { AppDb.get(ctx).dao() }
+    val prefs = remember { Prefs(ctx) }
     val scope = rememberCoroutineScope()
     val notifs by dao.all().collectAsState(initial = emptyList())
     val groups = remember(notifs) { notifs.groupBy { it.pkg } }
@@ -111,10 +137,12 @@ fun InboxScreen() {
         items(groups.entries.toList(), key = { it.key }) { (pkg, list) ->
             Card(
                 Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = Color(0xCC101A30))
+                colors = CardDefaults.cardColors(containerColor = Color(0xCC101A30), contentColor = Color.White)
             ) {
                 Column(Modifier.padding(12.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(14.dp).background(Color(prefs.appColor(pkg)), CircleShape))
+                        Spacer(Modifier.width(8.dp))
                         Text(
                             "${list.first().appName} (${list.size})",
                             style = MaterialTheme.typography.titleMedium,
@@ -146,10 +174,14 @@ private data class AppItem(val pkg: String, val name: String)
 fun SettingsScreen() {
     val ctx = LocalContext.current
     val prefs = remember { Prefs(ctx) }
+    val dao = remember { AppDb.get(ctx).dao() }
+    val scope = rememberCoroutineScope()
     var includeMode by remember { mutableStateOf(prefs.includeMode) }
     var excluded by remember { mutableStateOf(prefs.excluded) }
     var included by remember { mutableStateOf(prefs.included) }
     var apps by remember { mutableStateOf<List<AppItem>>(emptyList()) }
+    val colors = remember { mutableStateMapOf<String, Int>() }
+    var colorFor by remember { mutableStateOf<AppItem?>(null) }
 
     LaunchedEffect(Unit) {
         apps = withContext(Dispatchers.IO) {
@@ -174,10 +206,16 @@ fun SettingsScreen() {
             }
             Switch(checked = includeMode, onCheckedChange = { includeMode = it; prefs.includeMode = it })
         }
+        Text(
+            "Touche le rond de couleur d'une appli pour choisir la couleur de sa pastille.",
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+        )
         HorizontalDivider()
         LazyColumn {
             items(apps, key = { it.pkg }) { app ->
                 val checked = if (includeMode) app.pkg in included else app.pkg in excluded
+                val color = colors[app.pkg] ?: prefs.appColor(app.pkg)
                 Row(
                     Modifier.fillMaxWidth().clickable {
                         if (includeMode) {
@@ -191,9 +229,40 @@ fun SettingsScreen() {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(app.name, Modifier.weight(1f))
+                    Box(
+                        Modifier.size(28.dp).background(Color(color), CircleShape).clickable { colorFor = app }
+                    )
+                    Spacer(Modifier.width(12.dp))
                     Checkbox(checked = checked, onCheckedChange = null)
                 }
             }
         }
+    }
+
+    colorFor?.let { app ->
+        AlertDialog(
+            onDismissRequest = { colorFor = null },
+            title = { Text("Couleur : ${app.name}") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    BadgePalette.colors.chunked(4).forEach { row ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            row.forEach { c ->
+                                Box(
+                                    Modifier.size(44.dp).background(Color(c), CircleShape).clickable {
+                                        prefs.setAppColor(app.pkg, c)
+                                        colors[app.pkg] = c
+                                        colorFor = null
+                                        // rafraîchit tout de suite le widget
+                                        scope.launch { BadgeUpdater.update(ctx, dao.all().first()) }
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { colorFor = null }) { Text("Fermer") } }
+        )
     }
 }

@@ -6,6 +6,15 @@ Appli Android qui « crible » tes notifications : elle les capte, les retire de
 - Exclus par défaut : SMS, WhatsApp, téléphone (appels entrants et manqués).
 - Au premier lancement : appuyer sur « Autoriser l'accès » puis activer Le Crible dans la liste.
 
+## Pastilles de notifications
+
+- **Sur l'icône** : Le Crible poste une notification silencieuse (« N en attente »), sans son ni icône dans la barre d'état,
+  ce qui fait apparaître la pastille native de ton lanceur sur l'icône. Sa couleur et son style dépendent du lanceur :
+  l'appli ne peut pas les choisir. Sur Xiaomi, vérifier dans les réglages de notifications de Le Crible que les pastilles
+  sont autorisées.
+- **Pastilles de couleur** : Réglages → touche le rond d'une appli pour choisir sa couleur. Le widget « Le Crible »
+  (à ajouter sur l'écran d'accueil) affiche une pastille par couleur avec le nombre de notifications en attente.
+
 ## Compiler, tester et analyser avec GitHub
 
 1. Envoyer le contenu du dossier sur un dépôt GitHub (branche `main`).

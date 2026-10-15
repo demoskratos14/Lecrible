@@ -11,6 +11,18 @@ import kotlinx.coroutines.*
 class NotifService : NotificationListenerService() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var watchJob: Job? = null
+
+    override fun onListenerConnected() {
+        watchJob?.cancel()
+        watchJob = scope.launch {
+            AppDb.get(applicationContext).dao().all().collect { BadgeUpdater.update(applicationContext, it) }
+        }
+    }
+
+    override fun onListenerDisconnected() {
+        watchJob?.cancel()
+    }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         val prefs = Prefs(this)

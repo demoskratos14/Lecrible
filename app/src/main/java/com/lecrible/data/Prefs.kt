@@ -2,6 +2,7 @@ package com.lecrible.data
 
 import android.content.Context
 import androidx.core.content.edit
+import com.lecrible.BadgePalette
 import com.lecrible.NotifFilter
 
 class Prefs(ctx: Context) {
@@ -19,4 +20,9 @@ class Prefs(ctx: Context) {
     var included: Set<String>
         get() = sp.getStringSet("included", emptySet())!!.toSet()
         set(v) = sp.edit { putStringSet("included", v) }
+
+    /** Couleur de la pastille d'une application (turquoise par défaut). */
+    fun appColor(pkg: String): Int = sp.getInt("color_$pkg", BadgePalette.default)
+
+    fun setAppColor(pkg: String, color: Int) = sp.edit { putInt("color_$pkg", color) }
 }
