@@ -22,10 +22,11 @@ object NotifFilter {
         category: String?,
         includeMode: Boolean,
         included: Set<String>,
-        excluded: Set<String>
+        excluded: Set<String>,
+        includeOngoing: Boolean = false
     ): Boolean {
         if (pkg == ownPackage) return false          // jamais nos propres notifications
-        if (isOngoing) return false                  // musique, navigation, appel en cours
+        if (isOngoing && !includeOngoing) return false   // permanentes (musique, navigation...) : ignorées sauf option
         if (isGroupSummary) return false             // résumé de groupe
         if (category == CATEGORY_CALL) return false  // appels entrants / manqués
         return if (includeMode) pkg in included else pkg !in excluded

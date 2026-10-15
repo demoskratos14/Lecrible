@@ -1,6 +1,7 @@
 package com.lecrible
 
 import android.app.Notification
+import android.content.ComponentName
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import com.lecrible.data.AppDb
@@ -18,13 +19,29 @@ class NotifService : NotificationListenerService() {
         watchJob = scope.launch {
             AppDb.get(applicationContext).dao().all().collect { BadgeUpdater.update(applicationContext, it) }
         }
+        // Rattrapage : les notifications arrivées pendant que le service était coupé sont encore dans le volet
+        try {
+            activeNotifications?.forEach { capture(it) }
+        } catch (e: Exception) {
+            // service pas encore prêt : on réessaiera à la prochaine connexion
+        }
     }
 
     override fun onListenerDisconnected() {
         watchJob?.cancel()
+        // Demande au système de relancer le service tout de suite, sans attendre l'ouverture de l'appli
+        try {
+            requestRebind(ComponentName(this, NotifService::class.java))
+        } catch (e: Exception) {
+            // rien d'autre à faire
+        }
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
+        capture(sbn)
+    }
+
+    private fun capture(sbn: StatusBarNotification) {
         val prefs = Prefs(this)
         if (!shouldCapture(prefs, sbn)) return
 
@@ -60,7 +77,8 @@ class NotifService : NotificationListenerService() {
             category = n.category,
             includeMode = prefs.includeMode,
             included = prefs.included,
-            excluded = prefs.excluded
+            excluded = prefs.excluded,
+            includeOngoing = prefs.includeOngoing
         )
     }
 

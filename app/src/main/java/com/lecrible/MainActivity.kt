@@ -1,10 +1,14 @@
 package com.lecrible
 
 import android.Manifest
+import android.content.ComponentName
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
 import android.provider.Settings
+import android.service.notification.NotificationListenerService
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -56,6 +60,7 @@ fun App() {
     val ctx = LocalContext.current
     var tab by remember { mutableIntStateOf(0) }
     var allowed by remember { mutableStateOf(false) }
+    var batteryRestricted by remember { mutableStateOf(false) }
 
     // Android 13+ : autorisation d'afficher la notification silencieuse qui fait apparaître la pastille sur l'icône
     val askPostNotifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
@@ -65,6 +70,13 @@ fun App() {
 
     LifecycleResumeEffect(Unit) {
         allowed = NotificationManagerCompat.getEnabledListenerPackages(ctx).contains(ctx.packageName)
+        if (allowed) {
+            // Si Android a coupé le service en arrière-plan, on lui demande de le relancer
+            try {
+                NotificationListenerService.requestRebind(ComponentName(ctx, NotifService::class.java))
+            } catch (e: Exception) { }
+        }
+        batteryRestricted = !ctx.getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(ctx.packageName)
         onPauseOrDispose { }
     }
 
@@ -95,9 +107,34 @@ fun App() {
                         Column(Modifier.padding(16.dp)) {
                             Text("L'accès aux notifications n'est pas activé.")
                             Spacer(Modifier.height(8.dp))
+                            Text(
+                                "Si Android affiche « Paramètre restreint » : ouvre d'abord les infos de l'appli, " +
+                                    "touche ⋮ en haut à droite puis « Autoriser les paramètres restreints ».",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            OutlinedButton(onClick = {
+                                ctx.startActivity(
+                                    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${ctx.packageName}"))
+                                )
+                            }) { Text("1. Ouvrir les infos de l'appli") }
+                            Spacer(Modifier.height(4.dp))
                             Button(onClick = {
                                 ctx.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
-                            }) { Text("Autoriser l'accès") }
+                            }) { Text("2. Autoriser l'accès") }
+                        }
+                    }
+                }
+                if (allowed && batteryRestricted) {
+                    Card(Modifier.padding(horizontal = 12.dp, vertical = 4.dp).fillMaxWidth()) {
+                        Column(Modifier.padding(16.dp)) {
+                            Text("L'optimisation de batterie peut couper Le Crible en arrière-plan : des notifications risquent d'être manquées.")
+                            Spacer(Modifier.height(8.dp))
+                            Button(onClick = {
+                                ctx.startActivity(
+                                    Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:${ctx.packageName}"))
+                                )
+                            }) { Text("Désactiver l'optimisation") }
                         }
                     }
                 }
@@ -177,6 +214,7 @@ fun SettingsScreen() {
     val dao = remember { AppDb.get(ctx).dao() }
     val scope = rememberCoroutineScope()
     var includeMode by remember { mutableStateOf(prefs.includeMode) }
+    var includeOngoing by remember { mutableStateOf(prefs.includeOngoing) }
     var excluded by remember { mutableStateOf(prefs.excluded) }
     var included by remember { mutableStateOf(prefs.included) }
     var apps by remember { mutableStateOf<List<AppItem>>(emptyList()) }
@@ -205,6 +243,17 @@ fun SettingsScreen() {
                 )
             }
             Switch(checked = includeMode, onCheckedChange = { includeMode = it; prefs.includeMode = it })
+        }
+        Row(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Notifications permanentes", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "Aspirer aussi celles qui restent affichées (navigation privée, connexion en cours...). " +
+                        "Android refuse souvent de les retirer de l'écran : elles sont copiées ici mais peuvent y rester.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+            Switch(checked = includeOngoing, onCheckedChange = { includeOngoing = it; prefs.includeOngoing = it })
         }
         Text(
             "Touche le rond de couleur d'une appli pour choisir la couleur de sa pastille.",
@@ -262,7 +311,15 @@ fun SettingsScreen() {
                     }
                 }
             },
-            confirmButton = { TextButton(onClick = { colorFor = null }) { Text("Fermer") } }
+            confirmButton = { TextButton(onClick = { colorFor = null }) { Text("Fermer") } },
+            dismissButton = {
+                TextButton(onClick = {
+                    ctx.startActivity(
+                        Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, app.pkg)
+                    )
+                    colorFor = null
+                }) { Text("Réglages Android de l'appli") }
+            }
         )
     }
 }
