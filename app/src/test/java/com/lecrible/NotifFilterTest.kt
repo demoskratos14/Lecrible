@@ -71,4 +71,19 @@ class NotifFilterTest {
     @Test fun `la categorie d'appel correspond a la constante Android`() {
         assertEquals("call", NotifFilter.CATEGORY_CALL)
     }
+
+    @Test fun `avec l'option permanentes, les notifications en cours sont aspirees`() {
+        assertTrue(
+            NotifFilter.shouldCapture("com.exemple.irc", own, true, false, null, false, emptySet(), emptySet(), includeOngoing = true)
+        )
+    }
+
+    @Test fun `l'option permanentes n'autorise pas les resumes de groupe ni les appels`() {
+        assertFalse(
+            NotifFilter.shouldCapture("com.exemple.irc", own, true, true, null, false, emptySet(), emptySet(), includeOngoing = true)
+        )
+        assertFalse(
+            NotifFilter.shouldCapture("com.exemple.visio", own, true, false, NotifFilter.CATEGORY_CALL, false, emptySet(), emptySet(), includeOngoing = true)
+        )
+    }
 }
