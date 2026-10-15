@@ -21,6 +21,11 @@ class Prefs(ctx: Context) {
         get() = sp.getStringSet("included", emptySet())!!.toSet()
         set(v) = sp.edit { putStringSet("included", v) }
 
+    /** Aspirer aussi les notifications permanentes (ex. Chrome navigation privée, IRC). Désactivé par défaut. */
+    var includeOngoing: Boolean
+        get() = sp.getBoolean("includeOngoing", false)
+        set(v) = sp.edit { putBoolean("includeOngoing", v) }
+
     /** Couleur de la pastille d'une application (turquoise par défaut). */
     fun appColor(pkg: String): Int = sp.getInt("color_$pkg", BadgePalette.default)
 
