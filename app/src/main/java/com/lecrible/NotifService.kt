@@ -57,9 +57,12 @@ class NotifService : NotificationListenerService() {
 
         val entity = NotifEntity(
             notifKey = sbn.key, pkg = sbn.packageName, appName = appName,
-            title = title, text = text, time = sbn.postTime
+            title = title, text = text, time = sbn.postTime,
+            channelId = sbn.notification.channelId
         )
         val key = sbn.key
+        // Garde l'intention d'origine en mémoire pour pouvoir rouvrir l'écran exact depuis Le Crible
+        PendingIntentStore.put(key, sbn.notification.contentIntent)
         scope.launch {
             AppDb.get(applicationContext).dao().insert(entity)
             // On ne retire de l'écran qu'une fois sauvegardée

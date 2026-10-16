@@ -36,4 +36,22 @@ class BadgeLogicTest {
     @Test fun `la couleur par defaut fait partie de la palette`() {
         assertTrue(BadgePalette.default in BadgePalette.colors)
     }
+
+    @Test fun `une bulle par application avec sa couleur et son nombre`() {
+        val couleurs = mapOf("a" to rouge, "b" to bleu)
+        val bulles = BadgeLogic.bubbles(listOf("a", "b", "a", "a")) { couleurs.getValue(it) }
+        assertEquals(listOf(AppBubble("a", rouge, 3), AppBubble("b", bleu, 1)), bulles)
+    }
+
+    @Test fun `deux applis de meme couleur gardent chacune leur bulle`() {
+        val bulles = BadgeLogic.bubbles(listOf("a", "b")) { rouge }
+        assertEquals(2, bulles.size)
+    }
+
+    @Test fun `les bulles sont decoupees en pages de 4`() {
+        val bulles = (1..9).map { AppBubble("app$it", rouge, it) }
+        val pages = BadgeLogic.pages(bulles)
+        assertEquals(listOf(4, 4, 1), pages.map { it.size })
+        assertTrue(BadgeLogic.pages(emptyList()).isEmpty())
+    }
 }

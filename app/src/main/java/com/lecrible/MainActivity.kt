@@ -169,14 +169,17 @@ fun InboxScreen() {
 
     LazyColumn(contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
-            TextButton(onClick = { scope.launch { dao.clear() } }) { Text("Tout vider") }
+            TextButton(onClick = {
+                scope.launch { dao.clear() }
+                PendingIntentStore.clear()
+            }) { Text("Tout vider") }
         }
         items(groups.entries.toList(), key = { it.key }) { (pkg, list) ->
             Card(
                 Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = Color(0xCC101A30), contentColor = Color.White)
             ) {
-                Column(Modifier.padding(12.dp)) {
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.size(14.dp).background(Color(prefs.appColor(pkg)), CircleShape))
                         Spacer(Modifier.width(8.dp))
@@ -187,21 +190,87 @@ fun InboxScreen() {
                                 ctx.packageManager.getLaunchIntentForPackage(pkg)?.let { ctx.startActivity(it) }
                             }
                         )
-                        TextButton(onClick = { scope.launch { dao.deleteApp(pkg) } }) { Text("Vider") }
+                        TextButton(onClick = {
+                            list.forEach { PendingIntentStore.remove(it.notifKey) }
+                            scope.launch { dao.deleteApp(pkg) }
+                        }) { Text("Vider l'appli") }
                     }
-                    list.forEach { n -> NotifRow(n, df.format(Date(n.time))) { scope.launch { dao.delete(n.id) } } }
+                    list.forEach { n ->
+                        NotifCard(
+                            n = n,
+                            date = df.format(Date(n.time)),
+                            onOpen = {
+                                // comme une notification normale : on ouvre, puis elle disparaît de la liste
+                                if (PendingIntentStore.open(ctx, n)) {
+                                    PendingIntentStore.remove(n.notifKey)
+                                    scope.launch { dao.delete(n.id) }
+                                }
+                            },
+                            onDelete = {
+                                PendingIntentStore.remove(n.notifKey)
+                                scope.launch { dao.delete(n.id) }
+                            },
+                            onSettings = {
+                                try { ctx.startActivity(notificationSettingsIntent(n)) } catch (e: Exception) { }
+                            }
+                        )
+                    }
                 }
             }
         }
     }
 }
 
+/** Réglages Android du type de notification (ex. pour la masquer de l'écran de verrouillage). */
+private fun notificationSettingsIntent(n: NotifEntity): Intent =
+    if (n.channelId != null) {
+        Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+            .putExtra(Settings.EXTRA_APP_PACKAGE, n.pkg)
+            .putExtra(Settings.EXTRA_CHANNEL_ID, n.channelId)
+    } else {
+        Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, n.pkg)
+    }
+
+/** Une notification = une carte à part : toucher pour ouvrir, ✕ pour la supprimer, ⋮ pour ses réglages. */
 @Composable
-private fun NotifRow(n: NotifEntity, date: String, onDelete: () -> Unit) {
-    Column(Modifier.fillMaxWidth().clickable(onClick = onDelete).padding(vertical = 6.dp)) {
-        n.title?.let { Text(it, style = MaterialTheme.typography.bodyLarge) }
-        n.text?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
-        Text(date, style = MaterialTheme.typography.labelSmall)
+private fun NotifCard(
+    n: NotifEntity,
+    date: String,
+    onOpen: () -> Unit,
+    onDelete: () -> Unit,
+    onSettings: () -> Unit
+) {
+    var menu by remember { mutableStateOf(false) }
+    Card(
+        Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = Color(0x33FFFFFF), contentColor = Color.White)
+    ) {
+        Row(
+            Modifier.clickable(onClick = onOpen).padding(start = 12.dp, top = 8.dp, bottom = 8.dp, end = 4.dp),
+            verticalAlignment = Alignment.Top
+        ) {
+            Column(Modifier.weight(1f)) {
+                n.title?.let { Text(it, style = MaterialTheme.typography.bodyLarge) }
+                n.text?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+                Text(date, style = MaterialTheme.typography.labelSmall)
+            }
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                TextButton(onClick = onDelete, modifier = Modifier.size(44.dp), contentPadding = PaddingValues(0.dp)) {
+                    Text("✕")
+                }
+                Box {
+                    TextButton(onClick = { menu = true }, modifier = Modifier.size(44.dp), contentPadding = PaddingValues(0.dp)) {
+                        Text("⋮")
+                    }
+                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                        DropdownMenuItem(
+                            text = { Text("Réglages de ce type de notification") },
+                            onClick = { menu = false; onSettings() }
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 

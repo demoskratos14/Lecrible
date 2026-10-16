@@ -1,8 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Pour afficher la notification silencieuse qui fait apparaître la pastille sur l'icône (Android 13+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Pour proposer de désactiver l'optimisation de batterie, qui coupe le service en arrière-plan -->
+    <uses-permission
+        android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"
+        tools:ignore="BatteryLife" />
 
     <!-- Permet de lister les applis à lanceur sans QUERY_ALL_PACKAGES -->
     <queries>
@@ -39,6 +45,11 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/badge_widget_info" />
         </receiver>
+
+        <service
+            android:name=".BadgeWidgetService"
+            android:exported="false"
+            android:permission="android.permission.BIND_REMOTEVIEWS" />
 
         <service
             android:name=".NotifService"

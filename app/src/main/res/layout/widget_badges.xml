@@ -4,12 +4,21 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/widget_bg"
-    android:padding="8dp">
+    android:padding="4dp">
 
-    <ImageView
-        android:id="@+id/badges_image"
+    <!-- Pages de 4 bulles : on change de page en glissant le doigt vers le haut ou le bas -->
+    <StackView
+        android:id="@+id/badge_stack"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:contentDescription="@string/widget_description"
-        android:scaleType="fitStart" />
+        android:loopViews="true" />
+
+    <TextView
+        android:id="@+id/badge_empty"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:text="✓"
+        android:textColor="#66FFFFFF"
+        android:textSize="28sp" />
 </FrameLayout>

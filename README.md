@@ -13,7 +13,8 @@ Appli Android qui « crible » tes notifications : elle les capte, les retire de
   l'appli ne peut pas les choisir. Sur Xiaomi, vérifier dans les réglages de notifications de Le Crible que les pastilles
   sont autorisées.
 - **Pastilles de couleur** : Réglages → touche le rond d'une appli pour choisir sa couleur. Le widget « Le Crible »
-  (à ajouter sur l'écran d'accueil) affiche une pastille par couleur avec le nombre de notifications en attente.
+  (à ajouter sur l'écran d'accueil, taille d'une icône) affiche une bulle par application, dans la couleur choisie, avec son nombre
+  de notifications ; 4 bulles par page, on change de page en glissant le doigt vers le haut ou le bas.
 
 ## Compiler, tester et analyser avec GitHub
 

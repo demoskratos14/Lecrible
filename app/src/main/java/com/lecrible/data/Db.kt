@@ -2,6 +2,8 @@ package com.lecrible.data
 
 import android.content.Context
 import androidx.room.*
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
 
 @Entity(tableName = "notifs", indices = [Index(value = ["notifKey"], unique = true)])
@@ -12,7 +14,8 @@ data class NotifEntity(
     val appName: String,
     val title: String?,
     val text: String?,
-    val time: Long
+    val time: Long,
+    val channelId: String? = null
 )
 
 @Dao
@@ -33,14 +36,21 @@ interface NotifDao {
     suspend fun clear()
 }
 
-@Database(entities = [NotifEntity::class], version = 1, exportSchema = false)
+@Database(entities = [NotifEntity::class], version = 2, exportSchema = false)
 abstract class AppDb : RoomDatabase() {
     abstract fun dao(): NotifDao
 
     companion object {
         @Volatile private var inst: AppDb? = null
+
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE notifs ADD COLUMN channelId TEXT")
+            }
+        }
         fun get(ctx: Context): AppDb = inst ?: synchronized(this) {
             inst ?: Room.databaseBuilder(ctx.applicationContext, AppDb::class.java, "notifs.db")
+                .addMigrations(MIGRATION_1_2)
                 .build().also { inst = it }
         }
     }
