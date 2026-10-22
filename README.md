@@ -16,6 +16,17 @@ Appli Android qui « crible » tes notifications : elle les capte, les retire de
   (à ajouter sur l'écran d'accueil, taille d'une icône) affiche une bulle par application, dans la couleur choisie, avec son nombre
   de notifications ; 4 bulles par page, on change de page en glissant le doigt vers le haut ou le bas.
 
+## Ouverture, permanentes et fiabilité (v1.1)
+
+- **Toucher une notification** rouvre l'écran exact, comme Android. Cette intention n'existe qu'en mémoire : si Android a
+  arrêté l'appli ou redémarré le téléphone, Le Crible ouvre à la place le premier lien trouvé dans la notification (🔗,
+  aussi dans le menu ⋮), sinon l'application d'origine, et le dit.
+- **Permanentes** : section à part en haut de la liste, elles restent après ouverture, ne comptent pas dans la pastille ni
+  le widget et ne sont pas réécrites en boucle quand elles se mettent à jour sans changer. Pour les cacher de l'écran de
+  verrouillage : ⋮ → réglages → écran de verrouillage (sans désactiver la catégorie, sinon Android ne la transmet plus).
+- **Fiabilité** : onglet « État » (service relié ou non, dernière connexion / déconnexion, dernière erreur ou plantage,
+  bouton « Reconnecter »), chien de garde toutes les ~15 min, erreurs en arrière-plan interceptées au lieu d'arrêter l'appli.
+
 ## Compiler, tester et analyser avec GitHub
 
 1. Envoyer le contenu du dossier sur un dépôt GitHub (branche `main`).

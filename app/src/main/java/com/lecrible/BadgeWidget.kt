@@ -3,6 +3,7 @@ package com.lecrible
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.Context
+import android.util.Log
 import com.lecrible.data.AppDb
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -17,6 +18,8 @@ class BadgeWidget : AppWidgetProvider() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 BadgeUpdater.update(app, AppDb.get(app).dao().all().first())
+            } catch (e: Exception) {
+                Log.w("LeCrible", "widget", e)
             } finally {
                 pending.finish()
             }

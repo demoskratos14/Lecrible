@@ -61,4 +61,14 @@ class NotifDaoTest {
         dao.clear()
         assertEquals(0, dao.all().first().size)
     }
+
+    @Test fun recherche_par_cle_et_vidage_sauf_permanentes() = runBlocking {
+        dao.insert(notif("a", "app.un", 1))
+        dao.insert(notif("p", "app.un", 2).copy(ongoing = true, link = "https://exemple.org"))
+        assertEquals("https://exemple.org", dao.byKey("p")?.link)
+        assertEquals(null, dao.byKey("absente"))
+
+        dao.clearRegular()
+        assertEquals(listOf("p"), dao.all().first().map { it.notifKey })
+    }
 }

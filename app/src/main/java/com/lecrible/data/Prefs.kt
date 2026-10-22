@@ -30,4 +30,31 @@ class Prefs(ctx: Context) {
     fun appColor(pkg: String): Int = sp.getInt("color_$pkg", BadgePalette.default)
 
     fun setAppColor(pkg: String, color: Int) = sp.edit { putInt("color_$pkg", color) }
+
+    // --- Diagnostic : à quel moment le service a été relié / coupé, et dernière erreur ---
+
+    var lastConnected: Long
+        get() = sp.getLong("lastConnected", 0L)
+        set(v) = sp.edit { putLong("lastConnected", v) }
+
+    var lastDisconnected: Long
+        get() = sp.getLong("lastDisconnected", 0L)
+        set(v) = sp.edit { putLong("lastDisconnected", v) }
+
+    var lastCapture: Long
+        get() = sp.getLong("lastCapture", 0L)
+        set(v) = sp.edit { putLong("lastCapture", v) }
+
+    val lastError: String? get() = sp.getString("lastError", null)
+    val lastErrorTime: Long get() = sp.getLong("lastErrorTime", 0L)
+
+    /** Écriture immédiate (commit) : le processus peut s'arrêter juste après un plantage. */
+    fun recordError(where: String, e: Throwable) {
+        sp.edit(commit = true) {
+            putLong("lastErrorTime", System.currentTimeMillis())
+            putString("lastError", "$where : ${e.stackTraceToString().take(1200)}")
+        }
+    }
+
+    fun clearError() = sp.edit { remove("lastError"); remove("lastErrorTime") }
 }

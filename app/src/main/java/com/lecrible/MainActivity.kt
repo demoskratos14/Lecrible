@@ -8,6 +8,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
 import android.provider.Settings
+import android.widget.Toast
 import android.service.notification.NotificationListenerService
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -17,6 +18,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -35,6 +38,7 @@ import com.lecrible.data.AppDb
 import com.lecrible.data.NotifEntity
 import com.lecrible.data.Prefs
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -145,8 +149,13 @@ fun App() {
                 ) {
                     Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("Reçues") })
                     Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("Réglages") })
+                    Tab(selected = tab == 2, onClick = { tab = 2 }, text = { Text("État") })
                 }
-                if (tab == 0) InboxScreen() else SettingsScreen()
+                when (tab) {
+                    0 -> InboxScreen()
+                    1 -> SettingsScreen()
+                    else -> StatusScreen()
+                }
             }
         }
     }
@@ -159,26 +168,83 @@ fun InboxScreen() {
     val prefs = remember { Prefs(ctx) }
     val scope = rememberCoroutineScope()
     val notifs by dao.all().collectAsState(initial = emptyList())
-    val groups = remember(notifs) { notifs.groupBy { it.pkg } }
+    val ongoing = remember(notifs) { notifs.filter { it.ongoing } }
+    val groups = remember(notifs) { notifs.filter { !it.ongoing }.groupBy { it.pkg } }
     val df = remember { DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT) }
+
+    fun remove(n: NotifEntity) {
+        PendingIntentStore.remove(n.notifKey)
+        scope.launch { dao.delete(n.id) }
+    }
+
+    fun toast(msg: String) = Toast.makeText(ctx, msg, Toast.LENGTH_LONG).show()
+
+    // comme une notification normale : on ouvre l'écran exact ; une notification ordinaire disparaît ensuite de la liste,
+    // une permanente reste
+    fun open(n: NotifEntity) {
+        when (PendingIntentStore.open(ctx, n)) {
+            OpenResult.ORIGINAL -> if (!n.ongoing) remove(n)
+            OpenResult.LINK -> {
+                toast("Écran exact indisponible : lien ouvert à la place")
+                if (!n.ongoing) remove(n)
+            }
+            OpenResult.APP -> {
+                toast("Écran exact indisponible : appli ouverte à la place")
+                if (!n.ongoing) remove(n)
+            }
+            OpenResult.FAILED -> toast("Impossible d'ouvrir cette notification")
+        }
+    }
+
+    fun openLink(n: NotifEntity) {
+        val url = n.link ?: return
+        try {
+            ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        } catch (e: Exception) {
+            toast("Aucune appli pour ouvrir ce lien")
+        }
+    }
 
     if (notifs.isEmpty()) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("Aucune notification") }
         return
     }
 
+    val cardColors = CardDefaults.cardColors(containerColor = Color(0xCC101A30), contentColor = Color.White)
+
     LazyColumn(contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item {
-            TextButton(onClick = {
-                scope.launch { dao.clear() }
-                PendingIntentStore.clear()
-            }) { Text("Tout vider") }
+        if (groups.isNotEmpty()) {
+            item {
+                TextButton(onClick = {
+                    groups.values.flatten().forEach { PendingIntentStore.remove(it.notifKey) }
+                    scope.launch { dao.clearRegular() }
+                }) { Text(if (ongoing.isEmpty()) "Tout vider" else "Tout vider (sauf les permanentes)") }
+            }
+        }
+        if (ongoing.isNotEmpty()) {
+            item(key = "permanentes") {
+                Card(Modifier.fillMaxWidth(), colors = cardColors) {
+                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Permanentes (${ongoing.size})", style = MaterialTheme.typography.titleMedium)
+                        ongoing.forEach { n ->
+                            NotifCard(
+                                n = n,
+                                header = n.appName,
+                                date = df.format(Date(n.time)),
+                                onOpen = { open(n) },
+                                onDelete = { remove(n) },
+                                onSettings = {
+                                    try { ctx.startActivity(notificationSettingsIntent(n)) } catch (e: Exception) { }
+                                },
+                                onLink = if (n.link != null) ({ openLink(n) }) else null
+                            )
+                        }
+                    }
+                }
+            }
         }
         items(groups.entries.toList(), key = { it.key }) { (pkg, list) ->
-            Card(
-                Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = Color(0xCC101A30), contentColor = Color.White)
-            ) {
+            Card(Modifier.fillMaxWidth(), colors = cardColors) {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.size(14.dp).background(Color(prefs.appColor(pkg)), CircleShape))
@@ -198,21 +264,14 @@ fun InboxScreen() {
                     list.forEach { n ->
                         NotifCard(
                             n = n,
+                            header = null,
                             date = df.format(Date(n.time)),
-                            onOpen = {
-                                // comme une notification normale : on ouvre, puis elle disparaît de la liste
-                                if (PendingIntentStore.open(ctx, n)) {
-                                    PendingIntentStore.remove(n.notifKey)
-                                    scope.launch { dao.delete(n.id) }
-                                }
-                            },
-                            onDelete = {
-                                PendingIntentStore.remove(n.notifKey)
-                                scope.launch { dao.delete(n.id) }
-                            },
+                            onOpen = { open(n) },
+                            onDelete = { remove(n) },
                             onSettings = {
                                 try { ctx.startActivity(notificationSettingsIntent(n)) } catch (e: Exception) { }
-                            }
+                            },
+                            onLink = if (n.link != null) ({ openLink(n) }) else null
                         )
                     }
                 }
@@ -231,14 +290,16 @@ private fun notificationSettingsIntent(n: NotifEntity): Intent =
         Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, n.pkg)
     }
 
-/** Une notification = une carte à part : toucher pour ouvrir, ✕ pour la supprimer, ⋮ pour ses réglages. */
+/** Une notification = une carte à part : toucher pour ouvrir, ✕ pour la supprimer, ⋮ pour le lien et les réglages. */
 @Composable
 private fun NotifCard(
     n: NotifEntity,
+    header: String?,
     date: String,
     onOpen: () -> Unit,
     onDelete: () -> Unit,
-    onSettings: () -> Unit
+    onSettings: () -> Unit,
+    onLink: (() -> Unit)?
 ) {
     var menu by remember { mutableStateOf(false) }
     Card(
@@ -250,9 +311,10 @@ private fun NotifCard(
             verticalAlignment = Alignment.Top
         ) {
             Column(Modifier.weight(1f)) {
+                header?.let { Text(it, style = MaterialTheme.typography.labelMedium) }
                 n.title?.let { Text(it, style = MaterialTheme.typography.bodyLarge) }
                 n.text?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
-                Text(date, style = MaterialTheme.typography.labelSmall)
+                Text(if (n.link != null) "$date  🔗" else date, style = MaterialTheme.typography.labelSmall)
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 TextButton(onClick = onDelete, modifier = Modifier.size(44.dp), contentPadding = PaddingValues(0.dp)) {
@@ -263,12 +325,87 @@ private fun NotifCard(
                         Text("⋮")
                     }
                     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                        if (onLink != null) {
+                            DropdownMenuItem(
+                                text = { Text("Ouvrir le lien") },
+                                onClick = { menu = false; onLink() }
+                            )
+                        }
                         DropdownMenuItem(
                             text = { Text("Réglages de ce type de notification") },
                             onClick = { menu = false; onSettings() }
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+/** Onglet « État » : le service est-il relié, quand a-t-il été coupé, y a-t-il eu une erreur ? */
+@Composable
+fun StatusScreen() {
+    val ctx = LocalContext.current
+    val prefs = remember { Prefs(ctx) }
+    val scope = rememberCoroutineScope()
+    var tick by remember { mutableIntStateOf(0) }
+    LifecycleResumeEffect(Unit) {
+        tick++
+        onPauseOrDispose { }
+    }
+    val df = remember { DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.MEDIUM) }
+    fun fmt(t: Long) = if (t == 0L) "jamais" else df.format(Date(t))
+
+    val refresh = tick   // relit tout à chaque actualisation
+    val access = remember(refresh) { ServiceHealth.hasAccess(ctx) }
+    val connected = remember(refresh) { NotifService.connected }
+    val error = remember(refresh) { prefs.lastError }
+    val cardColors = CardDefaults.cardColors(containerColor = Color(0xCC101A30), contentColor = Color.White)
+
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Card(Modifier.fillMaxWidth(), colors = cardColors) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Service de notifications", style = MaterialTheme.typography.titleMedium)
+                Text("Accès accordé : ${if (access) "oui" else "non"}")
+                Text("Service relié : ${if (connected) "oui" else "non"}")
+                Text("Dernière connexion : ${fmt(prefs.lastConnected)}")
+                Text("Dernière déconnexion : ${fmt(prefs.lastDisconnected)}")
+                Text("Dernière notification captée : ${fmt(prefs.lastCapture)}")
+                Spacer(Modifier.height(4.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = {
+                        ServiceHealth.reconnect(ctx)
+                        scope.launch { delay(2000); tick++ }
+                    }) { Text("Reconnecter") }
+                    OutlinedButton(onClick = { tick++ }) { Text("Actualiser") }
+                }
+            }
+        }
+        Card(Modifier.fillMaxWidth(), colors = cardColors) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Dernière erreur", style = MaterialTheme.typography.titleMedium)
+                if (error == null) {
+                    Text("Aucune erreur enregistrée.")
+                } else {
+                    Text(fmt(prefs.lastErrorTime), style = MaterialTheme.typography.labelMedium)
+                    Text(error.take(700), style = MaterialTheme.typography.bodySmall)
+                    TextButton(onClick = { prefs.clearError(); tick++ }) { Text("Effacer") }
+                }
+            }
+        }
+        Card(Modifier.fillMaxWidth(), colors = cardColors) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Si le service se coupe malgré « Aucune restriction »", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "• Xiaomi : activer le démarrage automatique de Le Crible et verrouiller l'appli dans les applis récentes.\n" +
+                        "• Samsung : retirer Le Crible des applis en veille / en veille profonde.\n" +
+                        "• Android : dans les infos de l'appli, désactiver « Suspendre l'activité si l'appli n'est pas utilisée ».\n" +
+                        "• Éviter de fermer Le Crible en le balayant dans les applis récentes : sur certains téléphones, cela l'arrête.",
+                    style = MaterialTheme.typography.bodySmall
+                )
             }
         }
     }
@@ -318,7 +455,9 @@ fun SettingsScreen() {
                 Text("Notifications permanentes", style = MaterialTheme.typography.titleMedium)
                 Text(
                     "Aspirer aussi celles qui restent affichées (navigation privée, connexion en cours...). " +
-                        "Android refuse souvent de les retirer de l'écran : elles sont copiées ici mais peuvent y rester.",
+                        "Elles restent dans la section « Permanentes », même après ouverture. Android refuse souvent de les " +
+                        "retirer de l'écran : pour les cacher de l'écran de verrouillage, touche ⋮ sur la notification → réglages → " +
+                        "écran de verrouillage → ne pas afficher. Ne désactive pas la catégorie : Android ne la transmettrait plus à Le Crible.",
                     style = MaterialTheme.typography.bodySmall
                 )
             }

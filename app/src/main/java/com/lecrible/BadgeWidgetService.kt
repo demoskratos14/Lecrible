@@ -23,9 +23,13 @@ class BadgeWidgetService : RemoteViewsService() {
         override fun onDestroy() {}
 
         private fun load() {
-            val prefs = Prefs(ctx)
-            val notifs = runBlocking(Dispatchers.IO) { AppDb.get(ctx).dao().all().first() }
-            pages = BadgeLogic.pages(BadgeLogic.bubbles(notifs.map { it.pkg }, prefs::appColor))
+            pages = try {
+                val prefs = Prefs(ctx)
+                val notifs = runBlocking(Dispatchers.IO) { AppDb.get(ctx).dao().all().first() }
+                BadgeLogic.pages(BadgeLogic.bubbles(notifs.filter { !it.ongoing }.map { it.pkg }, prefs::appColor))
+            } catch (e: Exception) {
+                emptyList()
+            }
         }
 
         override fun getCount(): Int = pages.size

@@ -5,6 +5,9 @@
     <!-- Pour afficher la notification silencieuse qui fait apparaître la pastille sur l'icône (Android 13+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- Pour que le chien de garde (vérification toutes les ~15 min) survive à un redémarrage -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
     <!-- Pour proposer de désactiver l'optimisation de batterie, qui coupe le service en arrière-plan -->
     <uses-permission
         android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"
@@ -19,6 +22,7 @@
     </queries>
 
     <application
+        android:name=".LeCribleApp"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
@@ -50,6 +54,11 @@
             android:name=".BadgeWidgetService"
             android:exported="false"
             android:permission="android.permission.BIND_REMOTEVIEWS" />
+
+        <service
+            android:name=".WatchdogJobService"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
 
         <service
             android:name=".NotifService"

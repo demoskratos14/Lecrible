@@ -11,6 +11,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.util.Log
 import android.widget.RemoteViews
 import com.lecrible.data.NotifEntity
 
@@ -26,8 +27,10 @@ object BadgeUpdater {
 
     fun update(ctx: Context, notifs: List<NotifEntity>) {
         val app = ctx.applicationContext
-        updateNotification(app, notifs.size)
-        updateWidgets(app)
+        // Les permanentes ne sont pas « en attente » : elles ne comptent pas dans la pastille ni dans le widget
+        val waiting = notifs.count { !it.ongoing }
+        try { updateNotification(app, waiting) } catch (e: Exception) { Log.w("LeCrible", "pastille", e) }
+        try { updateWidgets(app) } catch (e: Exception) { Log.w("LeCrible", "widget", e) }
     }
 
     private fun openAppIntent(ctx: Context): PendingIntent =
